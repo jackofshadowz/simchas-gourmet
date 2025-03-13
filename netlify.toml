@@ -6,14 +6,7 @@
 [build.environment]
   NODE_VERSION = "18"
   NPM_VERSION = "9"
-
-[build.processing]
-  skip_processing = true
-
-[build.plugins]
-  package = "@netlify/plugin-nextjs"
-  [build.plugins.inputs]
-    enable = false
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
 
 [dev]
   command = "npm run dev"
