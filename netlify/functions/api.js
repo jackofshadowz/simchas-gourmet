@@ -1,9 +1,9 @@
-import express from 'express';
-import serverless from 'serverless-http';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { v4 as uuidv4 } from 'uuid';
-import fetch from 'node-fetch';
+const express = require('express');
+const serverless = require('serverless-http');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const { v4: uuidv4 } = require('uuid');
+const fetch = require('node-fetch');
 
 // Load environment variables
 dotenv.config();
@@ -197,4 +197,4 @@ const router = express.Router();
 router.use('/', app);
 
 // Export the serverless function
-export const handler = serverless(app);
+module.exports.handler = serverless(app);
