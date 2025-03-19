@@ -3,13 +3,16 @@ import type { CreateCheckoutRequest, CreateCheckoutResponse } from '../types';
 export async function createCheckoutSession(data: CreateCheckoutRequest): Promise<CreateCheckoutResponse> {
   try {
     // Determine the API URL based on the environment
-    const apiUrl = import.meta.env.PROD 
+    // In production, use the Netlify Functions path
+    // In development, use the local server path
+    const isProd = import.meta.env.PROD;
+    const apiUrl = isProd 
       ? '/.netlify/functions/api/create-payment' 
       : '/api/create-payment';
     
     console.log('Creating checkout session with data:', data);
     console.log('Using API URL:', apiUrl);
-    console.log('Environment:', import.meta.env.PROD ? 'production' : 'development');
+    console.log('Environment:', isProd ? 'production' : 'development');
     
     const response = await fetch(apiUrl, {
       method: 'POST',

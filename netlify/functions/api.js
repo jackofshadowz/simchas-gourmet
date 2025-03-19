@@ -70,10 +70,15 @@ const formatOrderDetails = (details) => {
   return formattedNote;
 };
 
-// Create payment link endpoint
-app.post('/create-payment', async (req, res) => {
-  console.log('Create payment request received at /create-payment:', req.body);
+// Create payment link endpoint - handle both paths for compatibility
+app.post('/create-payment', handleCreatePayment);
+app.post('/api/create-payment', handleCreatePayment);
+
+// Handler function for creating payment
+async function handleCreatePayment(req, res) {
+  console.log('Create payment request received at path:', req.path);
   console.log('Request headers:', req.headers);
+  console.log('Request body:', req.body);
   
   const { amount, orderDetails, customerInfo } = req.body;
   
@@ -189,7 +194,7 @@ app.post('/create-payment', async (req, res) => {
       stack: error.stack
     });
   }
-});
+}
 
 // Default route
 app.get('/', (req, res) => {
