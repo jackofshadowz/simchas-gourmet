@@ -78,7 +78,12 @@ app.post('/api/create-payment', handleCreatePayment);
 async function handleCreatePayment(req, res) {
   console.log('Create payment request received at path:', req.path);
   console.log('Request headers:', req.headers);
-  console.log('Request body:', req.body);
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  console.log('Environment variables:', {
+    SQUARE_ACCESS_TOKEN: process.env.VITE_SQUARE_ACCESS_TOKEN ? 'Set (first 5 chars: ' + process.env.VITE_SQUARE_ACCESS_TOKEN.substring(0, 5) + ')' : 'Not set',
+    SQUARE_APPLICATION_ID: process.env.VITE_SQUARE_APPLICATION_ID ? 'Set (first 5 chars: ' + process.env.VITE_SQUARE_APPLICATION_ID.substring(0, 5) + ')' : 'Not set',
+    SQUARE_LOCATION_ID: process.env.VITE_SQUARE_LOCATION_ID || 'Not set'
+  });
   
   const { amount, orderDetails, customerInfo } = req.body;
   

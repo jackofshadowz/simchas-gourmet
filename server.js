@@ -95,8 +95,23 @@ function generateUUID() {
 }
 
 app.post('/api/create-payment', async (req, res) => {
+  console.log('Create payment request received at /api/create-payment:', JSON.stringify(req.body, null, 2));
+  console.log('Request headers:', req.headers);
+  
+  const { amount, orderDetails, customerInfo } = req.body;
+  
+  // Validate required fields
+  if (!amount || !orderDetails || !orderDetails.items) {
+    console.error('Missing required fields:', { amount, orderDetails });
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  
   try {
-    const { amount, customerInfo, orderDetails } = req.body;
+    console.log('Square configuration:', {
+      accessToken: process.env.VITE_SQUARE_ACCESS_TOKEN ? 'Set (first 5 chars: ' + process.env.VITE_SQUARE_ACCESS_TOKEN.substring(0, 5) + ')' : 'Not set',
+      locationId: process.env.VITE_SQUARE_LOCATION_ID || 'Not set',
+      applicationId: process.env.VITE_SQUARE_APPLICATION_ID ? 'Set (first 5 chars: ' + process.env.VITE_SQUARE_APPLICATION_ID.substring(0, 5) + ')' : 'Not set'
+    });
     
     console.log('Received payment request:', JSON.stringify(req.body, null, 2));
 

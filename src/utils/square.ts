@@ -3,14 +3,15 @@ import type { CreateCheckoutRequest, CreateCheckoutResponse } from '../types';
 export async function createCheckoutSession(data: CreateCheckoutRequest): Promise<CreateCheckoutResponse> {
   try {
     // Determine the API URL based on the environment
-    // In production, use the Netlify Functions path
-    // In development, use the local server path
     const isProd = import.meta.env.PROD;
+    
+    // In development, use the local server path
+    // In production, use the Netlify Functions path
     const apiUrl = isProd 
       ? '/.netlify/functions/api/create-payment' 
       : '/api/create-payment';
     
-    console.log('Creating checkout session with data:', data);
+    console.log('Creating checkout session with data:', JSON.stringify(data, null, 2));
     console.log('Using API URL:', apiUrl);
     console.log('Environment:', isProd ? 'production' : 'development');
     
@@ -21,37 +22,15 @@ export async function createCheckoutSession(data: CreateCheckoutRequest): Promis
       },
       body: JSON.stringify(data),
     });
-
-    console.log('Received response status:', response.status);
-    console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
-
+    
+    console.log('Response status:', response.status);
+    console.log('Response headers:', JSON.stringify(Object.fromEntries([...response.headers.entries()]), null, 2));
+    
     // First check if the response is OK
     if (!response.ok) {
-      let errorMessage = `HTTP error! status: ${response.status}`;
-      
-      try {
-        // Try to parse the error response as JSON
-        const errorData = await response.json();
-        console.error('Error creating checkout session:', errorData);
-        
-        // Format a more detailed error message if possible
-        if (errorData.details && errorData.details.errors) {
-          const errorDetails = errorData.details.errors.map((err: any) => err.detail || err.message || JSON.stringify(err)).join('; ');
-          errorMessage = `Failed to create checkout session: ${errorDetails}`;
-        } else if (errorData.error) {
-          errorMessage = `Failed to create checkout session: ${errorData.error}`;
-          if (errorData.message) {
-            errorMessage += ` - ${errorData.message}`;
-          }
-        } else {
-          errorMessage = `Failed to create checkout session: ${JSON.stringify(errorData)}`;
-        }
-      } catch (parseError) {
-        // If we can't parse the response as JSON, use the status text
-        errorMessage = `Failed to create checkout session: ${response.statusText || 'Unknown error'}`;
-      }
-      
-      throw new Error(errorMessage);
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+      throw new Error(`Failed to create checkout session: ${errorText || 'Unknown error'}`);
     }
 
     // Parse the successful response
