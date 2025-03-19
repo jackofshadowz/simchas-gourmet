@@ -1,35 +1,39 @@
-import { useState, useRef } from 'react';
-import { Salad, MessageSquare } from 'lucide-react';
-import type { SaladTopping, Dressing, OrderState, CustomerInfo } from '../types';
+import { useRef, useState } from 'react';
+import { Salad } from 'lucide-react';
 import { createCheckoutSession } from '../utils/square';
+import type { Dressing, OrderState, SaladTopping } from '../types';
 
+// Constants
+const BASE_PRICE = 12.00;
+
+// Toppings - up to 4 allowed
 const TOPPINGS: SaladTopping[] = [
-  { name: 'Red Pepper' },
-  { name: 'Pickles' },
-  { name: 'Cucumbers' },
-  { name: 'Grape tomatoes' },
-  { name: 'Caesar croutons' },
-  { name: 'Craisins' },
-  { name: 'Baby Corn' },
-  { name: 'Chickpeas' },
-  { name: 'Hard boiled egg' },
+  { id: 1, name: 'Red Pepper', price: 0, selected: false },
+  { id: 2, name: 'Pickles', price: 0, selected: false },
+  { id: 3, name: 'Cucumbers', price: 0, selected: false },
+  { id: 4, name: 'Grape tomatoes', price: 0, selected: false },
+  { id: 5, name: 'Caesar croutons', price: 0, selected: false },
+  { id: 6, name: 'Craisins', price: 0, selected: false },
+  { id: 7, name: 'Baby Corn', price: 0, selected: false },
+  { id: 8, name: 'Chickpeas', price: 0, selected: false },
+  { id: 9, name: 'Hard boiled egg', price: 0, selected: false },
 ];
 
+// Dressings - choose 1
 const DRESSINGS: Dressing[] = [
-  { name: 'Caesar' },
-  { name: 'Light Caesar' },
-  { name: 'Fat free Italian' },
-  { name: 'Honey Dijon' },
+  { id: 1, name: 'Caesar', selected: false },
+  { id: 2, name: 'Light Caesar', selected: false },
+  { id: 3, name: 'Fat free Italian', selected: false },
+  { id: 4, name: 'Honey Dijon', selected: false },
 ];
 
+// Proteins - optional add-ons
 const PROTEINS: SaladTopping[] = [
-  { name: 'Tuna', price: 4 },
-  { name: 'Smoked Turkey Breast', price: 4 },
-  { name: 'Grilled Chicken', price: 6 },
-  { name: 'Fried Shnitzel', price: 6 },
+  { id: 1, name: 'Tuna', price: 4.00, selected: false },
+  { id: 2, name: 'Smoked Turkey Breast', price: 4.00, selected: false },
+  { id: 3, name: 'Grilled Chicken', price: 6.00, selected: false },
+  { id: 4, name: 'Fried Shnitzel', price: 6.00, selected: false },
 ];
-
-const BASE_PRICE = 12;
 
 export function SaladOrder() {
   const mainRef = useRef<HTMLDivElement>(null);
@@ -40,161 +44,205 @@ export function SaladOrder() {
     protein: null,
     total: BASE_PRICE,
     customerInfo: {
-      name: '',
-      phone: '',
-      address: '',
       specialRequests: '',
     },
   });
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Count selected toppings
   const selectedToppingsCount = order.toppings.filter(t => t.selected).length;
 
   const handleToppingToggle = (index: number) => {
+    // Limit to 4 toppings
     if (!order.toppings[index].selected && selectedToppingsCount >= 4) {
+      setError('You can only select up to 4 toppings');
       return;
     }
 
     const newToppings = [...order.toppings];
-    newToppings[index] = { ...newToppings[index], selected: !newToppings[index].selected };
-    setOrder({ ...order, toppings: newToppings });
-  };
-
-  const handleDressingSelect = (dressing: Dressing) => {
-    setOrder({ ...order, dressing: { ...dressing, selected: true } });
-  };
-
-  const handleProteinSelect = (protein: SaladTopping) => {
-    if (order.protein?.name === protein.name) {
-      setOrder({ ...order, protein: null, total: BASE_PRICE });
-    } else {
-      const total = BASE_PRICE + (protein.price || 0);
-      setOrder({ ...order, protein: { ...protein, selected: true }, total });
+    newToppings[index].selected = !newToppings[index].selected;
+    
+    // Clear error message if we're at or below 4 toppings
+    if (error === 'You can only select up to 4 toppings' && 
+        (newToppings.filter(t => t.selected).length <= 4 || newToppings[index].selected === false)) {
+      setError(null);
     }
-  };
-
-  const handleCustomerInfoChange = (field: keyof CustomerInfo, value: string) => {
+    
     setOrder({
       ...order,
-      customerInfo: {
-        ...order.customerInfo!,
-        [field]: value,
-      },
+      toppings: newToppings,
     });
   };
 
-  const handleSubmitOrder = () => {
-    if (selectedToppingsCount === 0 || !order.dressing) {
-      alert('Please select at least one topping and a dressing!');
+  const handleDressingSelect = (index: number) => {
+    const newDressings = DRESSINGS.map((d, i) => ({
+      ...d,
+      selected: i === index
+    }));
+    
+    setOrder({
+      ...order,
+      dressing: newDressings[index]
+    });
+  };
+
+  const handleProteinSelect = (index: number) => {
+    // If already selected, deselect it
+    if (order.protein?.id === PROTEINS[index].id) {
+      setOrder({
+        ...order,
+        protein: null,
+        total: calculateTotal(null)
+      });
       return;
     }
     
-    handlePayment();
+    const selectedProtein = PROTEINS[index];
+    
+    setOrder({
+      ...order,
+      protein: selectedProtein,
+      total: calculateTotal(selectedProtein)
+    });
   };
 
-  const handlePayment = async () => {
-    setError(null);
-    setIsLoading(true);
+  // Calculate total based on base price and protein
+  const calculateTotal = (protein: SaladTopping | null): number => {
+    let total = BASE_PRICE;
+    
+    // Add protein price if selected
+    if (protein) {
+      total += protein.price || 0;
+    }
+    
+    return total;
+  };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate that at least one topping is selected
+    if (selectedToppingsCount === 0) {
+      setError('Please select at least one topping');
+      return;
+    }
+    
+    // Validate that a dressing is selected
+    if (!order.dressing) {
+      setError('Please select a dressing');
+      return;
+    }
+    
+    handleCheckout();
+  };
+
+  const handleSpecialRequestsChange = (value: string) => {
+    setOrder({
+      ...order,
+      customerInfo: {
+        ...order.customerInfo,
+        specialRequests: value
+      }
+    });
+  };
+
+  const handleCheckout = async () => {
     try {
-      // Format the main salad item name to include toppings and special requests
-      let mainItemName = order.toppings.filter(t => t.selected).length > 0
-        ? `Custom Salad with ${order.toppings.filter(t => t.selected).map(t => t.name).join(', ')}`
-        : 'Custom Salad (No toppings)';
-        
-      // Add dressing to the item name
-      if (order.dressing) {
-        mainItemName += ` - ${order.dressing.name} dressing`;
+      setIsLoading(true);
+      setError('');
+
+      // Format toppings for display
+      const toppingsSelected = order.toppings.filter(t => t.selected);
+      const toppingsText = toppingsSelected.map(t => t.name).join(', ');
+
+      // Calculate total price
+      const totalPrice = order.total;
+
+      // Create detailed item name including special requests
+      let itemName = `Custom Salad - $${totalPrice.toFixed(2)}`;
+      if (order.protein && order.protein.name) {
+        itemName += `\nProtein: ${order.protein.name} (+$${order.protein.price?.toFixed(2)})`;
       }
-      
-      // Add special requests to the item name if present
-      if (order.customerInfo?.specialRequests) {
-        mainItemName += ` (Special Request: ${order.customerInfo.specialRequests})`;
+      if (toppingsText) {
+        itemName += `\nToppings (${toppingsSelected.length}/4): ${toppingsText}`;
+      }
+      if (order.dressing && order.dressing.name) {
+        itemName += `\nDressing: ${order.dressing.name}`;
+      }
+      if (order.customerInfo.specialRequests) {
+        itemName += `\nSpecial Requests: ${order.customerInfo.specialRequests}`;
       }
 
-      // Format order items with detailed descriptions
-      const items = [{
-        name: mainItemName,
-        quantity: 1,
-        amount: BASE_PRICE
-      }];
-
-      if (order.protein) {
-        items.push({
-          name: `Add ${order.protein.name}`,
-          quantity: 1,
-          amount: order.protein.price || 0
-        });
-      }
-
-      // Create a more detailed order summary
-      let orderSummary = `Order from Simchas Gourmet\n\n`;
-      
-      // Add each item with details
-      orderSummary += `Custom Salad - $${BASE_PRICE.toFixed(2)}\n`;
-      
-      // Add protein if selected
-      if (order.protein) {
-        orderSummary += `\n\nProtein: ${order.protein.name} - $${order.protein.price?.toFixed(2)}`;
-      }
-      
-      // Add toppings if selected
-      if (order.toppings.filter(t => t.selected).length > 0) {
-        orderSummary += `\n\nToppings: ${order.toppings.filter(t => t.selected).map(t => t.name).join(', ')}`;
-      } else {
-        orderSummary += `\n\nToppings: None selected`;
-      }
-      
-      // Add dressing if selected
-      if (order.dressing) {
-        orderSummary += `\nDressing: ${order.dressing.name}`;
-      } else {
-        orderSummary += `\nDressing: None selected`;
-      }
-      
-      // Add total
-      orderSummary += `\n\nTotal: $${order.total.toFixed(2)}`;
-      
-      // Add special requests if provided
-      if (order.customerInfo?.specialRequests) {
-        orderSummary += `\n\nSpecial Requests: ${order.customerInfo.specialRequests}`;
-      }
-
-      // Create a more detailed order description for Square
-      const orderDescription = {
-        base: 'Fresh Crispy Romaine',
-        toppings: order.toppings.filter(t => t.selected).map(t => t.name),
-        dressing: order.dressing?.name || 'None',
-        protein: order.protein?.name || 'None',
-        specialRequests: order.customerInfo?.specialRequests || ''
+      // Create order details object
+      const orderDetails = {
+        items: [
+          {
+            name: itemName,
+            quantity: 1,
+            amount: totalPrice
+          }
+        ],
+        notes: `Order from Simchas Gourmet\n\n${itemName}`,
+        description: {
+          protein: order.protein?.name || 'None',
+          toppings: toppingsText ? toppingsText.split(', ') : [],
+          dressing: order.dressing?.name || 'None',
+          specialRequests: order.customerInfo.specialRequests || 'None'
+        }
       };
 
-      const checkoutResponse = await createCheckoutSession({
-        amount: order.total,
-        customerInfo: {
-          name: '',
-          phone: '',
-          address: '',
-          specialRequests: order.customerInfo?.specialRequests || ''
-        },
-        orderDetails: {
-          items,
-          notes: orderSummary,
-          description: orderDescription
-        }
-      });
+      // Call the Square API to create a checkout session
+      const checkoutData = {
+        amount: totalPrice,
+        orderDetails,
+        customerInfo: order.customerInfo
+      };
+
+      console.log('Sending checkout data:', JSON.stringify(checkoutData, null, 2));
       
-      window.location.href = checkoutResponse.payment_link.url;
-    } catch (e) {
-      console.error('Payment error:', e);
-      setError('Failed to initialize payment. Please try again.');
+      try {
+        const checkoutResponse = await createCheckoutSession(checkoutData);
+        console.log('Checkout response:', JSON.stringify(checkoutResponse, null, 2));
+
+        // Redirect to the Square checkout page
+        if (checkoutResponse.payment_link && checkoutResponse.payment_link.url) {
+          window.location.href = checkoutResponse.payment_link.url;
+        } else {
+          console.error('Invalid checkout response:', checkoutResponse);
+          setError('Failed to create checkout link. Please try again. (Missing URL)');
+          setIsLoading(false);
+        }
+      } catch (checkoutError: any) {
+        console.error('Checkout error:', checkoutError);
+        
+        // Extract the error message if available
+        let errorMessage = 'Failed to create checkout link. Please try again.';
+        if (checkoutError.message) {
+          errorMessage = checkoutError.message;
+          // Clean up the error message if it's a JSON string
+          try {
+            const parsedError = JSON.parse(checkoutError.message.replace('Failed to create checkout session: ', ''));
+            if (parsedError.details && parsedError.details.errors) {
+              errorMessage = parsedError.details.errors.map((err: any) => err.detail).join('. ');
+            }
+          } catch (e) {
+            // If parsing fails, use the original error message
+          }
+        }
+        
+        setError(errorMessage);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      setError(`Failed to initialize payment. Please try again.`);
       setIsLoading(false);
     }
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-[#F5F5F5] text-gray-800" ref={mainRef}>
       <div className="w-full h-48 relative overflow-hidden">
         <img 
           src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=2000&q=80" 
@@ -203,90 +251,127 @@ export function SaladOrder() {
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-gray-50"></div>
       </div>
-
-      <main ref={mainRef} className="container mx-auto px-4 py-8 flex-grow">
-        <div className="max-w-3xl mx-auto space-y-8">
+      
+      <div className="container mx-auto py-8 px-4 max-w-4xl">
+        <div className="text-[#8B0000] text-center p-4 mb-8">
+          <p className="font-bold text-xl">DELIVERED FRESH TO</p>
+          <p className="font-bold text-xl">SHEVACH HIGH SCHOOL</p>
+          <p className="font-bold text-xl">DAILY AT 12:00PM</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-8">
           <section className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4">1. Start with Fresh Crispy Romaine</h2>
-            <p className="text-gray-600">Every salad starts with a generous bed of fresh, crispy romaine lettuce.</p>
+            <h2 className="text-2xl font-semibold mb-4">1. Fresh Crispy Romaine</h2>
+            <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <p className="font-medium">It all starts with a generous bed of fresh crispy romaine...</p>
+              <div className="flex items-center mt-4">
+                <div className="text-[#8B0000] p-4 flex items-center justify-center font-bold text-xl">
+                  <span>Just</span>
+                  <span className="text-3xl mx-1">$12</span>
+                  <span>+tax</span>
+                </div>
+              </div>
+            </div>
           </section>
-
+          
           <section className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4">2. Choose up to 4 Toppings</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <h2 className="text-2xl font-semibold mb-4">2. Choose up to 4 toppings:</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {order.toppings.map((topping, index) => (
-                <button
-                  key={topping.name}
+                <div 
+                  key={index}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                    topping.selected 
+                      ? 'border-[#8B0000] bg-red-50' 
+                      : 'border-gray-200 hover:border-[#8B0000] hover:bg-red-50'
+                  } ${!topping.selected && selectedToppingsCount >= 4 ? 'opacity-50 cursor-not-allowed' : ''}`}
                   onClick={() => handleToppingToggle(index)}
-                  className={`p-3 rounded-lg border transition-colors ${
-                    topping.selected
-                      ? 'bg-red-50 border-red-700 text-red-900'
-                      : 'border-gray-200 hover:border-red-300'
-                  }`}
-                  disabled={!topping.selected && selectedToppingsCount >= 4}
                 >
-                  {topping.name}
-                </button>
+                  <div className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      checked={topping.selected}
+                      onChange={() => {}}
+                      className="mr-3 h-5 w-5 accent-[#8B0000]"
+                    />
+                    <p className="font-medium">{topping.name}</p>
+                  </div>
+                </div>
               ))}
             </div>
             <p className="mt-4 text-sm text-gray-500">
               Selected: {selectedToppingsCount}/4
             </p>
           </section>
-
+          
           <section className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4">3. Choose Your Dressing</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {DRESSINGS.map((dressing) => (
-                <button
-                  key={dressing.name}
-                  onClick={() => handleDressingSelect(dressing)}
-                  className={`p-3 rounded-lg border transition-colors ${
-                    order.dressing?.name === dressing.name
-                      ? 'bg-red-50 border-red-700 text-red-900'
-                      : 'border-gray-200 hover:border-red-300'
+            <h2 className="text-2xl font-semibold mb-4">3. Dress it up (choose 1):</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {DRESSINGS.map((dressing, index) => (
+                <div 
+                  key={index}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                    order.dressing?.name === dressing.name 
+                      ? 'border-[#8B0000] bg-red-50' 
+                      : 'border-gray-200 hover:border-[#8B0000] hover:bg-red-50'
                   }`}
+                  onClick={() => handleDressingSelect(index)}
                 >
-                  {dressing.name}
-                </button>
+                  <div className="flex items-center">
+                    <input 
+                      type="radio" 
+                      checked={order.dressing?.name === dressing.name}
+                      onChange={() => {}}
+                      className="mr-3 h-5 w-5 accent-[#8B0000]"
+                    />
+                    <p className="font-medium">{dressing.name}</p>
+                  </div>
+                </div>
               ))}
             </div>
           </section>
-
+          
           <section className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4">4. Add Protein (Optional)</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {PROTEINS.map((protein) => (
-                <button
-                  key={protein.name}
-                  onClick={() => handleProteinSelect(protein)}
-                  className={`p-3 rounded-lg border transition-colors ${
-                    order.protein?.name === protein.name
-                      ? 'bg-red-50 border-red-700 text-red-900'
-                      : 'border-gray-200 hover:border-red-300'
+            <h2 className="text-2xl font-semibold mb-4">4. And add some pizzaz if you'd like:</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {PROTEINS.map((protein, index) => (
+                <div 
+                  key={index}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                    order.protein?.name === protein.name 
+                      ? 'border-[#8B0000] bg-red-50' 
+                      : 'border-gray-200 hover:border-[#8B0000] hover:bg-red-50'
                   }`}
+                  onClick={() => handleProteinSelect(index)}
                 >
-                  {protein.name} (+${protein.price})
-                </button>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <input 
+                        type="checkbox" 
+                        checked={order.protein?.name === protein.name}
+                        onChange={() => {}}
+                        className="mr-3 h-5 w-5 accent-[#8B0000]"
+                      />
+                      <p className="font-medium">{protein.name}</p>
+                    </div>
+                    <p className="font-medium text-[#8B0000]">+${protein.price?.toFixed(2)}</p>
+                  </div>
+                </div>
               ))}
             </div>
           </section>
-
+          
           <section className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4">5. Special Requests (Optional)</h2>
+            <h2 className="text-2xl font-semibold mb-4">5. Special Requests</h2>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                <span className="flex items-center gap-2">
-                  <MessageSquare size={16} />
-                  Any special instructions or dietary requirements?
-                </span>
+                Any special requests for your salad?
               </label>
               <textarea
-                value={order.customerInfo?.specialRequests || ''}
-                onChange={(e) => handleCustomerInfoChange('specialRequests', e.target.value)}
+                value={order.customerInfo.specialRequests || ''}
+                onChange={(e) => handleSpecialRequestsChange(e.target.value)}
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#8B0000] focus:border-[#8B0000] transition-all"
-                placeholder="Enter any special requests here"
                 rows={3}
+                placeholder="E.g., Extra dressing on the side, light on the onions, etc."
               />
             </div>
           </section>
@@ -296,29 +381,27 @@ export function SaladOrder() {
               <Salad size={24} />
               <span className="text-2xl font-bold">Total: ${order.total.toFixed(2)}</span>
             </div>
-            <button
-              onClick={handleSubmitOrder}
-              disabled={isLoading}
-              className="bg-[#8B0000] text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-red-900 transition-colors w-full md:w-auto disabled:opacity-50"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
-                  Processing...
-                </>
-              ) : (
-                'Place Order'
-              )}
-            </button>
             
             {error && (
-              <div className="mt-2 flex items-center gap-1 text-red-600 bg-red-50 p-2 rounded w-full md:w-auto">
-                <p className="text-sm">{error}</p>
+              <div className="bg-red-100 text-red-800 p-3 rounded-lg w-full text-center">
+                {error}
               </div>
             )}
+            
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="bg-[#8B0000] text-white font-bold py-3 px-8 rounded-lg text-lg w-full md:w-auto disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:bg-red-900"
+            >
+              {isLoading ? 'Processing...' : 'CLICK HERE TO ORDER'}
+            </button>
+            
+            <p className="text-sm text-gray-500 text-center">
+              You'll be redirected to our secure payment processor to complete your order.
+            </p>
           </div>
-        </div>
-      </main>
-    </>
+        </form>
+      </div>
+    </div>
   );
 }

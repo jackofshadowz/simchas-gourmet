@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import { SaladOrder } from './pages/SaladOrder';
 import { ShabbosBox } from './pages/ShabbosBox';
@@ -17,7 +16,7 @@ function App() {
             <nav className="flex gap-6">
               <Link 
                 to="/" 
-                className="text-lg font-semibold text-[#8B0000] hover:text-red-700 transition-colors"
+                className="text-2xl font-bold text-[#8B0000] hover:text-red-700 transition-colors"
               >
                 Salad Time
               </Link>

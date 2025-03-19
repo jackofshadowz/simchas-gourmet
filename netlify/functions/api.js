@@ -49,19 +49,20 @@ const formatOrderDetails = (details) => {
       const desc = details.description;
       formattedNote += '\nOrder Specifics:\n';
       
-      if (desc.base) formattedNote += `- Base: ${desc.base}\n`;
+      if (desc.protein) {
+        formattedNote += `- Protein: ${desc.protein}\n`;
+      }
       
       if (desc.toppings && desc.toppings.length > 0) {
         formattedNote += `- Toppings: ${desc.toppings.join(', ')}\n`;
-      } else {
-        formattedNote += '- Toppings: None selected\n';
       }
       
-      if (desc.dressing) formattedNote += `- Dressing: ${desc.dressing}\n`;
-      if (desc.protein) formattedNote += `- Protein: ${desc.protein}\n`;
+      if (desc.dressing) {
+        formattedNote += `- Dressing: ${desc.dressing}\n`;
+      }
       
-      if (desc.specialRequests) {
-        formattedNote += `\nSpecial Requests: ${desc.specialRequests}\n`;
+      if (desc.specialRequests && desc.specialRequests !== 'None') {
+        formattedNote += `- Special Requests: ${desc.specialRequests}\n`;
       }
     }
   }
@@ -107,6 +108,30 @@ app.post('/api/create-payment', async (req, res) => {
 
   try {
     // Create a payment link using Square API directly
+    console.log('Sending request to Square API:', JSON.stringify({
+      idempotency_key: generateUUID(),
+      order: {
+        location_id: SQUARE_LOCATION_ID,
+        line_items: lineItems,
+        note: formatOrderDetails(orderDetails)
+      },
+      checkout_options: {
+        redirect_url: `${process.env.URL || 'https://simchas-gourmet.netlify.app'}/order-success`,
+        merchant_support_email: 'support@simchasgourmet.com',
+        ask_for_shipping_address: true,
+        allow_tipping: false,
+        enable_coupon: false,
+        enable_loyalty: false,
+        app_fee_money: {
+          amount: 0,
+          currency: 'USD'
+        },
+        title: customerInfo?.specialRequests 
+          ? `Simchas Gourmet Order (Special Requests)`
+          : `Simchas Gourmet Order`
+      }
+    }));
+    
     const response = await fetch(`${SQUARE_API_URL}/online-checkout/payment-links`, {
       method: 'POST',
       headers: {
@@ -129,22 +154,13 @@ app.post('/api/create-payment', async (req, res) => {
           allow_tipping: false,
           enable_coupon: false,
           enable_loyalty: false,
-          // Add customer name to the order title
           app_fee_money: {
             amount: 0,
             currency: 'USD'
           },
-          title: customerInfo?.specialRequests || orderDetails.description?.specialRequests
-            ? customerInfo?.name 
-              ? `Order for ${customerInfo.name} (Special Requests)`
-              : `Simchas Gourmet Order (Special Requests)`
-            : customerInfo?.name 
-              ? `Order for ${customerInfo.name}`
-              : `Simchas Gourmet Order`
-        },
-        pre_populated_data: {
-          buyer_email: customerInfo?.email || '',
-          buyer_phone_number: customerInfo?.phone || ''
+          title: customerInfo?.specialRequests 
+            ? `Simchas Gourmet Order (Special Requests)`
+            : `Simchas Gourmet Order`
         }
       })
     });
@@ -152,17 +168,28 @@ app.post('/api/create-payment', async (req, res) => {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Square API error:', errorData);
-      return res.status(response.status).json({ error: 'Failed to create payment link', details: errorData });
+      return res.status(response.status).json({
+        error: 'Failed to create payment link',
+        details: errorData
+      });
     }
 
-    const data = await response.json();
-    console.log('Payment link created:', data);
+    const responseData = await response.json();
+    console.log('Square API response:', responseData);
     
-    return res.json(data);
+    return res.json(responseData);
   } catch (error) {
     console.error('Error creating payment link:', error);
-    return res.status(500).json({ error: 'Failed to create payment link', details: error.message });
+    return res.status(500).json({
+      error: 'Failed to create payment link',
+      message: error.message
+    });
   }
+});
+
+// Default route
+app.get('/', (req, res) => {
+  res.json({ message: 'Simchas Gourmet API is running' });
 });
 
 // Create a router to handle routes in Express

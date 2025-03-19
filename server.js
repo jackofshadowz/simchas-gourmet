@@ -97,6 +97,8 @@ function generateUUID() {
 app.post('/api/create-payment', async (req, res) => {
   try {
     const { amount, customerInfo, orderDetails } = req.body;
+    
+    console.log('Received payment request:', JSON.stringify(req.body, null, 2));
 
     // Validate required fields
     if (!amount || !orderDetails?.items) {
@@ -105,26 +107,10 @@ app.post('/api/create-payment', async (req, res) => {
       });
     }
 
-    // Format phone number to E.164 format (required by Square) if provided
-    let formattedPhone = '';
-    if (customerInfo?.phone) {
-      formattedPhone = customerInfo.phone;
-      // Remove any non-digit characters
-      formattedPhone = formattedPhone.replace(/\D/g, '');
-      // Ensure it has the country code
-      if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
-        formattedPhone = '1' + formattedPhone;
-      }
-      // Add the + prefix
-      formattedPhone = '+' + formattedPhone;
-    }
-
     console.log('Creating Square checkout with:', {
       locationId: SQUARE_LOCATION_ID,
       amount,
       customerInfo: { 
-        ...customerInfo, 
-        phone: formattedPhone ? formattedPhone.substring(0, 5) + '...' : 'Not provided',
         specialRequests: customerInfo?.specialRequests ? 'Special requests included' : 'No special requests'
       },
       orderItems: orderDetails.items.length,
@@ -181,25 +167,51 @@ app.post('/api/create-payment', async (req, res) => {
           const desc = details.description;
           formattedNote += '\nOrder Specifics:\n';
           
-          if (desc.base) formattedNote += `- Base: ${desc.base}\n`;
+          if (desc.protein) {
+            formattedNote += `- Protein: ${desc.protein}\n`;
+          }
           
           if (desc.toppings && desc.toppings.length > 0) {
             formattedNote += `- Toppings: ${desc.toppings.join(', ')}\n`;
-          } else {
-            formattedNote += '- Toppings: None selected\n';
           }
           
-          if (desc.dressing) formattedNote += `- Dressing: ${desc.dressing}\n`;
-          if (desc.protein) formattedNote += `- Protein: ${desc.protein}\n`;
+          if (desc.dressing) {
+            formattedNote += `- Dressing: ${desc.dressing}\n`;
+          }
           
-          if (desc.specialRequests) {
-            formattedNote += `\nSpecial Requests: ${desc.specialRequests}\n`;
+          if (desc.specialRequests && desc.specialRequests !== 'None') {
+            formattedNote += `- Special Requests: ${desc.specialRequests}\n`;
           }
         }
       }
       
       return formattedNote;
     };
+
+    // Log the request we're about to send to Square
+    console.log('Sending request to Square API:', JSON.stringify({
+      idempotency_key: generateUUID(),
+      order: {
+        location_id: SQUARE_LOCATION_ID,
+        line_items: lineItems,
+        note: formatOrderDetails(orderDetails)
+      },
+      checkout_options: {
+        redirect_url: `${process.env.NODE_ENV === 'production' ? 'https://simchas-gourmet.netlify.app' : 'http://localhost:5173'}/order-success`,
+        merchant_support_email: 'support@simchasgourmet.com',
+        ask_for_shipping_address: true,
+        allow_tipping: false,
+        enable_coupon: false,
+        enable_loyalty: false,
+        app_fee_money: {
+          amount: 0,
+          currency: 'USD'
+        },
+        title: customerInfo?.specialRequests 
+          ? `Simchas Gourmet Order (Special Requests)`
+          : `Simchas Gourmet Order`
+      }
+    }));
 
     try {
       // Create a payment link using Square API directly
@@ -219,34 +231,19 @@ app.post('/api/create-payment', async (req, res) => {
             note: formatOrderDetails(orderDetails)
           },
           checkout_options: {
-            redirect_url: `${process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5173'}/order-success`,
+            redirect_url: `${process.env.NODE_ENV === 'production' ? 'https://simchas-gourmet.netlify.app' : 'http://localhost:5173'}/order-success`,
             merchant_support_email: 'support@simchasgourmet.com',
             ask_for_shipping_address: true,
             allow_tipping: false,
             enable_coupon: false,
             enable_loyalty: false,
-            // Add customer name to the order title
             app_fee_money: {
               amount: 0,
               currency: 'USD'
             },
-            title: customerInfo?.specialRequests || orderDetails.description?.specialRequests
-              ? customerInfo?.name 
-                ? `Order for ${customerInfo.name} (Special Requests)`
-                : `Simchas Gourmet Order (Special Requests)`
-              : customerInfo?.name 
-                ? `Order for ${customerInfo.name}`
-                : `Simchas Gourmet Order`
-          },
-          pre_populated_data: {
-            // Only include email if it exists and is valid
-            ...(customerInfo?.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email) 
-              ? { buyer_email: customerInfo.email } 
-              : {}),
-            // Only include phone if it's valid
-            ...(formattedPhone.length >= 12 ? { buyer_phone_number: formattedPhone } : {}),
-            // Only include name if provided
-            ...(customerInfo?.name ? { buyer_name: customerInfo.name } : {})
+            title: customerInfo?.specialRequests 
+              ? `Simchas Gourmet Order (Special Requests)`
+              : `Simchas Gourmet Order`
           }
         })
       });
@@ -283,10 +280,13 @@ app.post('/api/create-payment', async (req, res) => {
         });
       }
 
-      res.json({
-        url: responseData.payment_link.url,
-        orderId: responseData.payment_link.order_id || 'unknown'
-      });
+      const responseToClient = {
+        payment_link: responseData.payment_link
+      };
+      
+      console.log('Sending response to client:', JSON.stringify(responseToClient, null, 2));
+      
+      res.json(responseToClient);
     } catch (error) {
       console.error('Square API error:', error);
       return res.status(500).json({
@@ -302,6 +302,47 @@ app.post('/api/create-payment', async (req, res) => {
     });
   }
 });
+
+// Test the Square token on server startup
+(async function testSquareToken() {
+  try {
+    console.log('Testing Square API token...');
+    const response = await fetch(`${SQUARE_API_URL}/locations`, {
+      method: 'GET',
+      headers: {
+        'Square-Version': '2023-09-25',
+        'Authorization': `Bearer ${SQUARE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const responseText = await response.text();
+    console.log('Square API test response status:', response.status);
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+      console.log('Square API test response:', JSON.stringify(responseData, null, 2));
+      
+      if (response.ok) {
+        console.log('Square API token is valid!');
+        if (responseData.locations && responseData.locations.length > 0) {
+          console.log('Available locations:', responseData.locations.map(loc => ({
+            id: loc.id,
+            name: loc.name,
+            status: loc.status
+          })));
+        }
+      } else {
+        console.error('Square API token test failed:', responseData);
+      }
+    } catch (e) {
+      console.error('Failed to parse Square API test response:', responseText.substring(0, 200));
+    }
+  } catch (error) {
+    console.error('Error testing Square API token:', error);
+  }
+})();
 
 // Create Vite server
 const vite = await createServer({
