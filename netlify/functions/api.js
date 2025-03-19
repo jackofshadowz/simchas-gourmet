@@ -70,9 +70,10 @@ const formatOrderDetails = (details) => {
   return formattedNote;
 };
 
-// Create payment link endpoint - handle both paths for compatibility
+// Create payment link endpoint - handle all possible paths for compatibility
 app.post('/create-payment', handleCreatePayment);
 app.post('/api/create-payment', handleCreatePayment);
+app.post('/.netlify/functions/api/create-payment', handleCreatePayment);
 
 // Handler function for creating payment
 async function handleCreatePayment(req, res) {

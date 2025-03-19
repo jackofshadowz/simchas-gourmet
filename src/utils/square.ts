@@ -5,11 +5,11 @@ export async function createCheckoutSession(data: CreateCheckoutRequest): Promis
     // Determine the API URL based on the environment
     const isProd = import.meta.env.PROD;
     
-    // In development, use the local server path
+    // In development, use the local server path with the correct port
     // In production, use the Netlify Functions path
     const apiUrl = isProd 
       ? '/.netlify/functions/api/create-payment' 
-      : '/api/create-payment';
+      : 'http://localhost:3001/api/create-payment';
     
     console.log('Creating checkout session with data:', JSON.stringify(data, null, 2));
     console.log('Using API URL:', apiUrl);

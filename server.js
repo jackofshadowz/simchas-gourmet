@@ -8,7 +8,13 @@ import fetch from 'node-fetch';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// CORS middleware
+app.use(cors({
+  origin: ['http://localhost:3001', 'http://localhost:5173', 'http://localhost:3000', 'https://simchas-gourmet.netlify.app'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 // Use the production URL
@@ -368,7 +374,7 @@ const vite = await createServer({
 // Use Vite's middleware
 app.use(vite.middlewares);
 
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
