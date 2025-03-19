@@ -71,7 +71,7 @@ const formatOrderDetails = (details) => {
 };
 
 // Create payment link endpoint
-app.post('/api/create-payment', async (req, res) => {
+app.post('/create-payment', async (req, res) => {
   console.log('Create payment request received:', req.body);
   
   const { amount, orderDetails, customerInfo } = req.body;
