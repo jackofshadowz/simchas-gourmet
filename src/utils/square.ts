@@ -8,6 +8,8 @@ export async function createCheckoutSession(data: CreateCheckoutRequest): Promis
       : '/api/create-payment';
     
     console.log('Creating checkout session with data:', data);
+    console.log('Using API URL:', apiUrl);
+    console.log('Environment:', import.meta.env.PROD ? 'production' : 'development');
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -16,6 +18,9 @@ export async function createCheckoutSession(data: CreateCheckoutRequest): Promis
       },
       body: JSON.stringify(data),
     });
+
+    console.log('Received response status:', response.status);
+    console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
 
     // First check if the response is OK
     if (!response.ok) {

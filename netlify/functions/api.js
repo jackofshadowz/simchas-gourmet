@@ -72,7 +72,8 @@ const formatOrderDetails = (details) => {
 
 // Create payment link endpoint
 app.post('/create-payment', async (req, res) => {
-  console.log('Create payment request received:', req.body);
+  console.log('Create payment request received at /create-payment:', req.body);
+  console.log('Request headers:', req.headers);
   
   const { amount, orderDetails, customerInfo } = req.body;
   
@@ -180,9 +181,12 @@ app.post('/create-payment', async (req, res) => {
     return res.json(responseData);
   } catch (error) {
     console.error('Error creating payment link:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return res.status(500).json({
       error: 'Failed to create payment link',
-      message: error.message
+      message: error.message,
+      stack: error.stack
     });
   }
 });
